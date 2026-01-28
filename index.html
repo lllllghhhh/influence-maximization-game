@@ -3,17 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>節點守護者 v7 (教師完美版)</title>
+    <title>流量密碼戰 (學生版)</title>
     <style>
-        /* --- 1. 全局鎖定設定 (解決手機網址列干擾) --- */
+        /* --- 1. 全局鎖定設定 --- */
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
         html, body {
             margin: 0; padding: 0;
             width: 100%; height: 100%;
-            position: fixed; /* 關鍵：鎖死視窗位置 */
+            position: fixed; /* 鎖死視窗，防止滑動 */
             top: 0; left: 0;
-            overflow: hidden; /* 禁止捲動 */
+            overflow: hidden;
             font-family: "Microsoft JhengHei", "Segoe UI", sans-serif;
             background-color: #f0f2f5;
             display: flex; flex-direction: column;
@@ -23,12 +23,11 @@
         header {
             background-color: #2c3e50; color: white; padding: 8px 12px;
             display: flex; justify-content: space-between; align-items: center;
-            height: 50px; flex-shrink: 0; /* 禁止壓縮 */
-            z-index: 10;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            height: 50px; flex-shrink: 0;
+            z-index: 10; box-shadow: 0 2px 5px rgba(0,0,0,0.1);
         }
         .title h1 { margin: 0; font-size: 1.1rem; line-height: 1.2; white-space: nowrap; }
-        .title small { font-size: 0.75rem; color: #bdc3c7; display: block; }
+        .title small { font-size: 0.75rem; color: #bdc3c7; display: block; margin-top: 2px;}
 
         .seed-ctrl {
             display: flex; align-items: center; background: rgba(255,255,255,0.1);
@@ -44,30 +43,23 @@
             font-weight: bold; white-space: nowrap;
         }
 
-        /* --- 3. 中間畫布 (彈性空間) --- */
+        /* --- 3. 中間畫布 --- */
         #canvas-wrapper {
-            flex: 1; /* 自動填滿剩餘空間 */
-            min-height: 0; /* 允許縮小 */
-            position: relative; background: #fff; width: 100%; 
-            overflow: hidden;
-            touch-action: none; /* 禁止瀏覽器預設觸控行為 */
+            flex: 1; min-height: 0; position: relative; 
+            background: #fff; width: 100%; overflow: hidden;
+            touch-action: none; /* 禁止預設觸控 */
         }
         canvas { display: block; width: 100%; height: 100%; }
 
         /* --- 浮動數據面板 --- */
         #data-panel {
-            position: absolute;
-            top: 10px; left: 10px;
-            width: 160px;
+            position: absolute; top: 10px; left: 10px; width: 160px;
             background: rgba(255, 255, 255, 0.96);
-            border: 1px solid #7f8c8d;
-            border-radius: 8px;
+            border: 1px solid #7f8c8d; border-radius: 8px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.2);
             display: flex; flex-direction: column;
-            z-index: 90;
-            overflow: hidden;
-            transition: opacity 0.2s;
-            opacity: 0; pointer-events: none; transform: scale(0.9);
+            z-index: 90; overflow: hidden;
+            transition: opacity 0.2s; opacity: 0; pointer-events: none; transform: scale(0.9);
             max-height: 60%;
         }
         #data-panel.visible { opacity: 1; pointer-events: auto; transform: scale(1); }
@@ -97,13 +89,12 @@
         /* --- 4. 底部控制區 --- */
         .footer {
             background: white; border-top: 1px solid #ccc; padding: 8px;
-            flex-shrink: 0; /* 禁止被壓縮 */
-            display: flex; flex-direction: column; gap: 6px;
-            padding-bottom: env(safe-area-inset-bottom); /* 避開 iPhone 底條 */
+            flex-shrink: 0; display: flex; flex-direction: column; gap: 6px;
+            padding-bottom: env(safe-area-inset-bottom);
         }
 
         .legend {
-            display: flex; gap: 10px; font-size: 0.8rem; justify-content: center; color: #666; flex-wrap: wrap;
+            display: flex; gap: 10px; font-size: 0.8rem; justify-content: center; color: #666;
         }
         .legend span { display: flex; align-items: center; gap: 4px; }
         .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
@@ -115,7 +106,7 @@
         }
         .status-bar b { color: #e74c3c; font-size: 1.1rem; }
 
-        .btn-group { display: flex; gap: 6px; height: 44px; }
+        .btn-group { display: flex; gap: 8px; height: 44px; }
         .btn {
             flex: 1; border: none; border-radius: 6px;
             font-size: 0.95rem; font-weight: bold; color: white; cursor: pointer;
@@ -124,10 +115,10 @@
         .btn:active { opacity: 0.8; }
         .btn:disabled { opacity: 0.5; cursor: not-allowed; filter: grayscale(1); }
         
-        .btn-reset { background: #95a5a6; flex: 0.5; font-size: 0.9rem;}
-        .btn-toggle { background: #34495e; flex: 0.5; font-size: 0.9rem;}
-        .btn-ai { background: #8e44ad; flex: 0.6; }
-        .btn-start { background: #27ae60; flex: 1.2; font-size: 1.1rem; }
+        /* 移除 AI 按鈕，調整比例 */
+        .btn-reset { background: #95a5a6; flex: 0.6; }
+        .btn-toggle { background: #34495e; flex: 0.6; }
+        .btn-start { background: #27ae60; flex: 1.5; font-size: 1.1rem; }
 
         #toast {
             position: absolute; top: 60px; left: 50%; transform: translateX(-50%);
@@ -137,20 +128,17 @@
         }
 
         /* ====== 5. 橫向模式 (Landscape) 優化 ====== */
-        /* 當高度小於 500px 時 (手機橫放) */
         @media (max-height: 500px) {
             header { height: 40px; padding: 0 8px; }
             .title h1 { font-size: 1rem; }
-            .title small { display: none; } /* 隱藏副標題 */
+            .title small { display: none; }
             
-            /* 縮小底部間距與按鈕 */
             .footer { padding: 4px 8px; gap: 4px; }
-            .legend { display: none; } /* 隱藏圖例 */
+            .legend { display: none; }
             .status-bar { padding: 2px 8px; font-size: 0.8rem; height: 24px; }
             .btn-group { height: 34px; }
             .btn { font-size: 0.85rem; }
             
-            /* 調整面板 */
             #data-panel { max-height: 80%; width: 140px; font-size: 0.9em; }
             #panel-header { padding: 4px 8px; }
         }
@@ -160,8 +148,8 @@
 
 <header>
     <div class="title">
-        <h1>節點守護者 v7</h1>
-        <small>拖曳表格 | 窮舉 AI</small>
+        <h1>流量密碼戰</h1>
+        <small>尋找關鍵 (學生版)</small>
     </div>
     <div class="seed-ctrl">
         <input type="number" id="seedInput" value="2026">
@@ -174,12 +162,12 @@
     
     <div id="data-panel">
         <div id="panel-header">
-            <span>數據驗算</span>
+            <span>節點數據</span>
             <button class="btn-min" onclick="toggleMinimize(event)">_</button>
         </div>
         <div id="panel-content">
             <table class="data-table">
-                <thead><tr><th>ID</th><th>H</th><th>接收</th></tr></thead>
+                <thead><tr><th>ID</th><th>門檻</th><th>接收</th></tr></thead>
                 <tbody id="data-body"></tbody>
             </table>
         </div>
@@ -201,8 +189,7 @@
     <div class="btn-group">
         <button class="btn btn-reset" onclick="resetGame()">重置</button>
         <button class="btn btn-toggle" onclick="toggleTable()">表格</button>
-        <button class="btn btn-ai" onclick="runAI()">AI</button>
-        <button class="btn btn-start" id="btn-start" onclick="startSim()" disabled>開始</button>
+        <button class="btn btn-start" id="btn-start" onclick="startSim()" disabled>開始擴散</button>
     </div>
 </div>
 
@@ -236,12 +223,11 @@ window.onload = function() {
     canvas = document.getElementById('gameCanvas');
     ctx = canvas.getContext('2d');
     
-    // RWD 設定
     const wrapper = document.getElementById('canvas-wrapper');
     const resizeObserver = new ResizeObserver(() => resizeCanvas());
     resizeObserver.observe(wrapper);
     
-    // 事件監聽 (Mouse + Touch)
+    // 事件監聽 (統一處理觸控與滑鼠)
     canvas.addEventListener('mousedown', onPointerDown);
     canvas.addEventListener('touchstart', onPointerDown, {passive: false});
     
@@ -275,7 +261,6 @@ function resizeCanvas() {
     height = rect.height;
 }
 
-// --- 取得座標 (統一 Touch 與 Mouse) ---
 function getPointerPos(e) {
     let rect = canvas.getBoundingClientRect();
     let clientX = e.clientX;
@@ -291,22 +276,20 @@ function getPointerPos(e) {
     return { x: clientX - rect.left, y: clientY - rect.top };
 }
 
-// --- ★ 核心修正：觸控互動邏輯 ---
+// --- ★ 觸控互動邏輯 (核心修正) ---
 function onPointerDown(e) {
     if(isSimulating) return;
     if(e.target !== canvas) return;
-    // 防止觸控時產生反白或捲動
     if(e.type === 'touchstart') e.preventDefault();
 
     let pos = getPointerPos(e);
-    
     for(let n of nodes) {
-        // 1.8倍半徑，讓手指好點
+        // 1.8倍半徑，容易點擊
         if(Math.hypot(pos.x - n.x, pos.y - n.y) < NODE_RADIUS * 1.8) {
             dragNode = n;
             dragStartPos = {x: pos.x, y: pos.y};
             isDraggingNode = false;
-            touchStartTime = Date.now(); // 記錄按下時間
+            touchStartTime = Date.now(); // 記錄時間
             return;
         }
     }
@@ -319,7 +302,7 @@ function onPointerMove(e) {
     let pos = getPointerPos(e);
     if(!isDraggingNode) {
         let dist = Math.hypot(pos.x - dragStartPos.x, pos.y - dragStartPos.y);
-        // ★ 防手震：移動超過 10px 才算拖曳
+        // ★ 移動超過 10px 才算拖曳 (防手震)
         if(dist > 10) isDraggingNode = true;
     }
     if(isDraggingNode) {
@@ -334,7 +317,7 @@ function onPointerUp(e) {
 
     if(dragNode) {
         let timeDiff = Date.now() - touchStartTime;
-        // ★ 判定：如果沒有拖曳，或者動作超快(<200ms)，都視為點擊
+        // ★ 如果動作很快(<200ms) 或 沒有移動，都視為點擊
         if(!isDraggingNode || timeDiff < 200) {
             toggleSeed(dragNode);
         }
@@ -347,7 +330,7 @@ function onPointerUp(e) {
 function toggleTable() {
     const panel = document.getElementById('data-panel');
     panel.classList.toggle('visible');
-    // 若在小螢幕跑到外面，重置位置
+    // 自動回正
     if(window.innerWidth < 500 && panel.offsetLeft > width - 50) {
         panel.style.left = '10px'; panel.style.top = '10px';
     }
@@ -543,9 +526,6 @@ function drawCurve(s, t, active, w, drawLabel) {
         if(active) { ctx.strokeStyle = '#f1c40f'; ctx.lineWidth = 4; } 
         else { ctx.strokeStyle = '#ccc'; ctx.lineWidth = 1.5; }
         ctx.stroke();
-        let it = 0.15; // 箭頭位置
-        let ax = it*it*s.x + 2*it*(1-it)*cx + (1-it)*(1-it)*t.x; // 這裡反向計算有點複雜，直接簡化
-        // 箭頭
         let t_ = 0.85, it_ = 1-t_;
         let ax_ = it_*it_*s.x + 2*it_*t_*cx + t_*t_*t.x;
         let ay_ = it_*it_*s.y + 2*it_*t_*cy + t_*t_*t.y;
@@ -594,7 +574,7 @@ function showToast(msg) {
 async function startSim() {
     isSimulating = true;
     document.querySelectorAll('.btn').forEach(b => b.disabled = true);
-    showToast("能量傳遞中...");
+    showToast("擴散中...");
     let queue = [...seeds];
     let visitedEdges = new Set();
     while(queue.length > 0) {
@@ -619,80 +599,16 @@ async function startSim() {
         queue = nextQueue;
         updateUI(); updateTable(); 
     }
-    showToast("模擬結束");
+    showToast("擴散結束");
     document.querySelector('.btn-reset').disabled = false;
     document.querySelector('.btn-toggle').disabled = false;
-    document.querySelector('.btn-ai').disabled = false;
+    // Removed AI button reference
 }
 
 function resetGame() {
     resetGameData();
     document.querySelectorAll('.btn').forEach(b => b.disabled = false);
     document.getElementById('btn-start').disabled = true;
-}
-
-// AI 運算 (暴力窮舉)
-function runAI() {
-    if(isSimulating) return;
-    resetGame();
-    showToast("AI 窮舉中... (請稍候)");
-    
-    // 延遲執行以免卡住 UI
-    setTimeout(() => {
-        const staticData = nodes.map(n => ({
-            id: n.id, power: n.power, threshold: n.threshold,
-            edges: n.neighbors.map(e => ({ targetId: e.target.id, weight: e.weight }))
-        }));
-
-        let bestCombination = [];
-        let maxScore = -1;
-
-        for(let i = 0; i < NODE_COUNT; i++) {
-            for(let j = i + 1; j < NODE_COUNT; j++) {
-                for(let k = j + 1; k < NODE_COUNT; k++) {
-                    let testSet = [i, j, k]; 
-                    let score = fastSimulate(staticData, testSet);
-                    if(score > maxScore) {
-                        maxScore = score;
-                        bestCombination = testSet;
-                    }
-                }
-            }
-        }
-        bestCombination.forEach(idx => toggleSeed(nodes[idx]));
-        showToast(`AI 最佳解: ${maxScore} 個`);
-    }, 100);
-}
-
-function fastSimulate(graph, seedIndices) {
-    let states = new Array(graph.length).fill(0); 
-    let inputs = new Array(graph.length).fill(0);
-    let visitedEdges = new Set();
-    let queue = [];
-    seedIndices.forEach(idx => { states[idx] = 1; queue.push(idx); });
-    let activeCount = seedIndices.length;
-
-    while(queue.length > 0) {
-        let nextQueue = [];
-        for(let uIdx of queue) {
-            let u = graph[uIdx];
-            for(let edge of u.edges) {
-                let targetIdx = edge.targetId - 1; 
-                let key = `${uIdx}-${targetIdx}`;
-                if(visitedEdges.has(key)) continue;
-                visitedEdges.add(key);
-                if(states[targetIdx] === 1) continue; 
-                inputs[targetIdx] += u.power * edge.weight;
-            }
-        }
-        for(let i=0; i<graph.length; i++) {
-            if(states[i] === 0 && inputs[i] > graph[i].threshold) {
-                states[i] = 1; nextQueue.push(i); activeCount++;
-            }
-        }
-        queue = nextQueue;
-    }
-    return activeCount;
 }
 </script>
 </body>
