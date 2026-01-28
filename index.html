@@ -1,748 +1,539 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>流量密碼戰 (學生版)</title>
-<style>
-    :root {
-        --header-height: 50px;
-        --footer-height: 100px;
-    }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>流量密碼戰</title>
+    <style>
+        /* --- 全局設定 --- */
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        
+        /* 強制鎖定畫面高度，解決手機瀏覽器網址列伸縮導致按鈕跑掉的問題 
+           使用 fixed 讓 body 永遠剛好填滿螢幕
+        */
+        html, body {
+            margin: 0; padding: 0;
+            width: 100%; height: 100%;
+            position: fixed; /* 關鍵：鎖死位置 */
+            top: 0; left: 0;
+            overflow: hidden; /* 禁止任何捲動 */
+            font-family: "Microsoft JhengHei", Arial, sans-serif;
+            background-color: #f4f6f9;
+            display: flex;
+            flex-direction: column;
+        }
 
-    body {
-        font-family: "Microsoft JhengHei", "Segoe UI", sans-serif;
-        margin: 0; padding: 0;
-        background-color: #f0f2f5;
-        display: flex; flex-direction: column;
-        /* 關鍵修改：使用 dvh (Dynamic Viewport Height) 解決手機網址列問題 */
-        height: 100vh; 
-        height: 100dvh; 
-        overflow: hidden; 
-        touch-action: none; /* 禁止瀏覽器默認手勢 */
-    }
+        /* --- 上方標題區 --- */
+        .header {
+            background-color: #2c3e50;
+            color: white;
+            padding: 8px 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-shrink: 0; /* 禁止壓縮 */
+            z-index: 10;
+            height: 50px; /* 固定高度 */
+        }
+        .title { font-size: 1.1rem; font-weight: bold; white-space: nowrap; }
+        .subtitle { font-size: 0.8em; opacity: 0.8; font-weight: normal; }
+        .header-controls { display: flex; gap: 5px; }
+        
+        input[type="number"] {
+            width: 50px; padding: 4px; border-radius: 4px; border: none; text-align: center;
+        }
 
-    header {
-        background-color: #2c3e50; color: white; padding: 0 10px;
-        display: flex; justify-content: space-between; align-items: center;
-        height: var(--header-height); flex-shrink: 0;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-        z-index: 10;
-    }
-    .title h1 { margin: 0; font-size: 1.1rem; line-height: 1.2; }
-    .title small { font-size: 0.7rem; color: #bdc3c7; display: block;}
+        /* --- 中間畫布區 (彈性伸縮) --- */
+        #canvas-wrapper {
+            flex: 1; /* 自動填滿剩餘空間 */
+            width: 100%;
+            position: relative;
+            background: #fff;
+            overflow: hidden; /* 確保畫布不會撐開版面 */
+            touch-action: none; /* 禁止瀏覽器預設觸控 */
+        }
+        canvas { display: block; width: 100%; height: 100%; }
 
-    .seed-ctrl {
-        display: flex; align-items: center; background: rgba(255,255,255,0.1);
-        padding: 4px; border-radius: 4px;
-    }
-    .seed-ctrl input {
-        width: 50px; border: none; border-radius: 2px; 
-        text-align: center; padding: 6px 2px; font-weight: bold; font-size: 1rem;
-        /* 防止 iOS 放大輸入框 */
-        font-size: 16px; 
-    }
-    .seed-ctrl button {
-        margin-left: 5px; padding: 6px 10px; cursor: pointer;
-        background: #3498db; color: white; border: none; border-radius: 2px;
-        font-weight: bold; font-size: 0.9rem;
-    }
+        /* --- 底部區域 (包含狀態與按鈕) --- */
+        .footer-section {
+            background: #fff;
+            border-top: 1px solid #ddd;
+            flex-shrink: 0; /* 禁止壓縮 */
+            display: flex;
+            flex-direction: column;
+            z-index: 20;
+            /* 針對 iPhone X+ 底部橫條的適配 */
+            padding-bottom: env(safe-area-inset-bottom); 
+        }
 
-    #canvas-wrapper {
-        flex: 1; position: relative; background: #fff; width: 100%; overflow: hidden;
-        cursor: grab;
-        /* 防止 iOS 橡皮筋效果 */
-        overscroll-behavior: none;
-    }
-    #canvas-wrapper:active { cursor: grabbing; }
-    canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+        /* 狀態列 */
+        .status-bar {
+            padding: 4px 10px;
+            font-size: 12px;
+            color: #555;
+            background: #f8f9fa;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            height: 30px; /* 固定高度 */
+        }
+        .legend { display: flex; align-items: center; gap: 8px; }
+        .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 3px; }
 
-    /* 面板樣式優化 */
-    #data-panel {
-        position: absolute;
-        top: 10px; left: 10px;
-        width: 150px; /* 手機版稍窄 */
-        background: rgba(255, 255, 255, 0.96);
-        border: 1px solid #7f8c8d;
-        border-radius: 8px;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-        display: flex; flex-direction: column;
-        z-index: 90;
-        overflow: hidden;
-        transition: opacity 0.3s, transform 0.3s;
-        opacity: 0; pointer-events: none; transform: scale(0.9);
-        max-height: 50vh; /* 防止面板太高 */
-    }
-    #data-panel.visible { opacity: 1; pointer-events: auto; transform: scale(1); }
+        /* 按鈕區 */
+        .controls {
+            padding: 8px;
+            display: flex;
+            gap: 8px;
+            justify-content: space-between;
+            background: #fff;
+        }
 
-    #panel-header {
-        background: #34495e; color: white; padding: 8px 10px;
-        cursor: move; font-size: 0.85rem; font-weight: bold;
-        display: flex; justify-content: space-between; align-items: center;
-        user-select: none;
-    }
-    
-    .btn-min {
-        background: none; border: 1px solid rgba(255,255,255,0.5);
-        color: white; border-radius: 4px; width: 24px; height: 24px;
-        display: flex; align-items: center; justify-content: center;
-        cursor: pointer; font-size: 14px;
-    }
+        .btn {
+            flex: 1;
+            padding: 10px 0; /* 上下 padding */
+            border: none; border-radius: 6px;
+            font-size: 15px; font-weight: bold;
+            color: white; cursor: pointer;
+            text-align: center;
+            white-space: nowrap; /* 禁止文字換行 */
+        }
+        .btn:active { opacity: 0.8; }
+        .btn:disabled { opacity: 0.5; }
 
-    #panel-content {
-        overflow-y: auto; padding: 0;
-        transition: max-height 0.3s ease;
-        /* 手機上預設展開的高度限制 */
-        max-height: 200px;
-    }
-    #data-panel.minimized #panel-content { max-height: 0; display: none; }
-    
-    table.data-table { width: 100%; border-collapse: collapse; font-size: 0.75rem; }
-    table.data-table th { background: #ecf0f1; text-align: center; padding: 6px 2px; position: sticky; top: 0; z-index: 2; }
-    table.data-table td { border-bottom: 1px solid #eee; text-align: center; padding: 6px 2px; }
-    .row-seed { background-color: #fab1a0; }
-    .row-active { background-color: #ff7675; color: white; }
-    .row-wa { background-color: #ffeaa7; }
+        .btn-grey { background-color: #7f8c8d; }
+        .btn-blue { background-color: #34495e; }
+        .btn-green { background-color: #27ae60; }
+        .btn-small { padding: 4px 8px; font-size: 13px; background: #3498db; color: white; border:none; border-radius:3px;}
 
-    /* 底部區域優化 */
-    .footer {
-        background: white; border-top: 1px solid #ccc; padding: 8px 10px;
-        flex-shrink: 0; display: flex; flex-direction: column; gap: 8px;
-        /* 確保在 iPhone X 等有 Home Bar 的手機上留出底部空間 */
-        padding-bottom: env(safe-area-inset-bottom, 10px);
-    }
+        /* --- 數據面板 --- */
+        #data-panel {
+            position: absolute; top: 0; right: 0; bottom: 0; /* 佔滿右側高度 */
+            width: 200px; 
+            background: rgba(255,255,255,0.95);
+            border-left: 1px solid #ccc;
+            box-shadow: -2px 0 5px rgba(0,0,0,0.1);
+            display: none; flex-direction: column;
+            z-index: 100;
+        }
+        #data-panel.visible { display: flex; }
+        .panel-header { padding: 8px; background: #eee; font-weight: bold; border-bottom: 1px solid #ddd; display: flex; justify-content: space-between; height: 40px; align-items: center;}
+        .panel-content { overflow-y: auto; flex: 1; font-size: 12px; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 5px; text-align: center; border-bottom: 1px solid #eee; }
+        .row-seed { background-color: #fadbd8; }
+        .row-active { background-color: #d5f5e3; }
 
-    .legend {
-        display: flex; gap: 10px; font-size: 0.75rem; justify-content: center; color: #666; flex-wrap: wrap;
-    }
-    .legend span { display: flex; align-items: center; gap: 4px; }
-    .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+        #toast {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.7); color: white; padding: 10px 20px;
+            border-radius: 20px; pointer-events: none; opacity: 0; transition: opacity 0.3s; z-index: 999;
+        }
 
-    .status-bar {
-        display: flex; justify-content: space-between;
-        background: #f1f2f6; padding: 6px 10px; border-radius: 5px;
-        font-size: 0.85rem; color: #555; font-weight: bold;
-    }
-    .status-bar b { color: #e74c3c; font-size: 1rem; }
-
-    .btn-group { display: flex; gap: 8px; height: 48px; /* 加高按鈕 */ }
-    .btn {
-        flex: 1; border: none; border-radius: 8px;
-        font-size: 1rem; font-weight: bold; color: white; cursor: pointer;
-        /* 增加點擊回饋 */
-        transition: filter 0.2s;
-        display: flex; align-items: center; justify-content: center;
-    }
-    .btn:active { filter: brightness(0.9); }
-    .btn:disabled { opacity: 0.4; cursor: not-allowed; filter: grayscale(0.5); }
-    .btn-reset { background: #95a5a6; flex: 0.5; font-size: 0.9rem; }
-    .btn-toggle { background: #34495e; flex: 0.5; font-size: 0.9rem; }
-    .btn-start { background: #27ae60; flex: 1.2; font-size: 1.1rem; box-shadow: 0 4px 0 #219150; margin-bottom: 4px; }
-    .btn-start:active { box-shadow: 0 2px 0 #219150; transform: translateY(2px); margin-bottom: 2px; }
-    .btn-start:disabled { box-shadow: none; margin-bottom: 0; }
-
-    #toast {
-        position: absolute; top: 60px; left: 50%; transform: translateX(-50%);
-        background: rgba(0,0,0,0.85); color: white; padding: 12px 24px;
-        border-radius: 30px; font-size: 0.95rem; opacity: 0; pointer-events: none; transition: opacity 0.3s;
-        z-index: 100; text-align: center; width: auto; max-width: 80%;
-        white-space: nowrap;
-    }
-
-    /* 手機版特別調整 */
-    @media (max-width: 480px) {
-        .title h1 { font-size: 1rem; }
-        .seed-ctrl button { padding: 6px 8px; font-size: 0.8rem; }
-        .seed-ctrl input { width: 45px; }
-        #data-panel { width: 130px; font-size: 0.9em; }
-        .legend { font-size: 0.7rem; gap: 6px; }
-    }
-</style>
+        /* ====== 關鍵修正：手機橫向模式 (Landscape) ====== 
+           當高度小於 500px 時 (手機橫放通常是 350px-400px)，
+           強制縮小所有 UI 元素，把空間讓給地圖。
+        */
+        @media (max-height: 500px) {
+            .header { height: 40px; padding: 0 10px; }
+            .title { font-size: 0.9rem; }
+            .subtitle { display: none; } /* 隱藏副標題省空間 */
+            
+            .status-bar { height: 24px; font-size: 11px; padding: 0 5px;}
+            
+            .controls { padding: 4px 8px; } /* 減少按鈕區塊的間距 */
+            .btn { 
+                padding: 5px 0; /* 按鈕變扁 */
+                font-size: 13px; /* 字體變小 */
+                border-radius: 4px;
+            }
+            
+            /* 調整數據面板以適應矮螢幕 */
+            #data-panel { width: 160px; font-size: 11px; }
+            .panel-header { height: 30px; padding: 4px; }
+        }
+    </style>
 </head>
 <body>
 
-<header>
-    <div class="title">
-        <h1>流量密碼戰</h1>
-        <small>尋找關鍵 3 人 (學生版)</small>
-    </div>
-    <div class="seed-ctrl">
-        <input type="number" id="seedInput" value="2026" inputmode="numeric">
-        <button onclick="reloadMap()">載入</button>
-    </div>
-</header>
-
-<div id="canvas-wrapper">
-    <canvas id="gameCanvas"></canvas>
-    
-    <div id="data-panel">
-        <div id="panel-header">
-            <span>數據驗算</span>
-            <button class="btn-min" onclick="toggleMinimize(event)">_</button>
-        </div>
-        <div id="panel-content">
-            <table class="data-table">
-                <thead><tr><th>ID</th><th>H</th><th>接收量</th></tr></thead>
-                <tbody id="data-body"></tbody>
-            </table>
+    <div class="header">
+        <div class="title">流量密碼戰 <span class="subtitle">尋找關鍵 (學生版)</span></div>
+        <div class="header-controls">
+            <input type="number" id="seedInput" value="2026">
+            <button class="btn-small" onclick="reloadMap()">載入</button>
         </div>
     </div>
 
-    <div id="toast">請選擇 3 個節點</div>
-</div>
-
-<div class="footer">
-    <div class="legend">
-        <span><i class="dot" style="background:#ecf0f1; border:1px solid #bdc3c7"></i>未啟動</span>
-        <span><i class="dot" style="background:#e74c3c"></i>種子</span>
-        <span><i class="dot" style="background:#ff7675"></i>擴散</span>
-        <span>藍字:接收量</span>
+    <div id="canvas-wrapper">
+        <canvas id="gameCanvas"></canvas>
+        <div id="toast">提示訊息</div>
+        
+        <div id="data-panel">
+            <div class="panel-header">
+                <span>數據</span>
+                <button onclick="toggleTable()" style="border:none;background:none;font-weight:bold;padding:0 5px;">✕</button>
+            </div>
+            <div class="panel-content">
+                <table id="data-table">
+                    <thead><tr><th>ID</th><th>檻</th><th>收</th></tr></thead> <tbody id="data-body"></tbody>
+                </table>
+            </div>
+        </div>
     </div>
-    <div class="status-bar">
-        <span>選取: <b id="ui-seeds">0</b>/3</span>
-        <span>總擴散數: <b id="ui-active">0</b>/16</span>
+
+    <div class="footer-section">
+        <div class="status-bar">
+            <div class="legend">
+                <div><span class="dot" style="background:#e74c3c"></span>種子</div>
+                <div><span class="dot" style="background:#ff7675"></span>擴散</div>
+            </div>
+            <div>
+                選取: <span id="ui-seeds" style="color:#e74c3c; font-weight:bold;">0</span>/3
+                | 總擴散: <span id="ui-active">0</span>/16
+            </div>
+        </div>
+        <div class="controls">
+            <button class="btn btn-grey" onclick="resetGame()">重置</button>
+            <button class="btn btn-blue" onclick="toggleTable()">數據表</button>
+            <button id="btn-start" class="btn btn-green" onclick="startSim()" disabled>開始擴散</button>
+        </div>
     </div>
-    <div class="btn-group">
-        <button class="btn btn-reset" onclick="resetGame()">重置</button>
-        <button class="btn btn-toggle" onclick="toggleTable()">數據表</button>
-        <button class="btn btn-start" id="btn-start" onclick="startSim()" disabled>開始擴散</button>
-    </div>
-</div>
 
-<script>
-// --- 參數 ---
-const NODE_COUNT = 16; 
-const NODE_RADIUS = 24; // 可稍微縮小以適應手機，但保持 24 比較好按
-const MAX_SEEDS = 3;
+    <script>
+        const NODE_COUNT = 16; 
+        const NODE_RADIUS = 28; 
+        const MAX_SEEDS = 3;
 
-// --- 變數 ---
-let canvas, ctx;
-let width, height;
-let nodes = []; 
-let seeds = new Set();
-let isSimulating = false;
-let mySeed = 2026;
-
-// 拖曳控制
-let dragNode = null;
-let dragStartPos = {x:0, y:0};
-let isDraggingNode = false; 
-
-// --- 隨機數 ---
-function seededRandom() {
-    mySeed = (mySeed * 9301 + 49297) % 233280;
-    return mySeed / 233280;
-}
-
-window.onload = function() {
-    canvas = document.getElementById('gameCanvas');
-    ctx = canvas.getContext('2d');
-    
-    window.addEventListener('resize', resizeCanvas);
-    
-    // 註冊事件 - 統一處理 Touch 與 Mouse
-    canvas.addEventListener('mousedown', onPointerDown);
-    canvas.addEventListener('touchstart', onPointerDown, {passive: false});
-    
-    canvas.addEventListener('mousemove', onPointerMove);
-    canvas.addEventListener('touchmove', onPointerMove, {passive: false});
-    
-    window.addEventListener('mouseup', onPointerUp);
-    window.addEventListener('touchend', onPointerUp);
-
-    initDraggablePanel();
-
-    setTimeout(() => {
-        resizeCanvas();
-        reloadMap();
-        requestAnimationFrame(loop);
-    }, 100);
-};
-
-function resizeCanvas() {
-    const wrapper = document.getElementById('canvas-wrapper');
-    // 使用 getBoundingClientRect 獲取更精確的像素尺寸
-    const rect = wrapper.getBoundingClientRect();
-    width = canvas.width = rect.width;
-    height = canvas.height = rect.height;
-    
-    // 重繪時不需重新生成地圖，只需確保邊界檢查
-}
-
-function toggleTable() {
-    const panel = document.getElementById('data-panel');
-    panel.classList.toggle('visible');
-    
-    // 在手機上打開時，預設最小化以免遮擋，除非它是第一次打開
-    if (window.innerWidth < 600 && !panel.dataset.opened) {
-         // panel.classList.add('minimized'); // 選擇性開啟此行
-         panel.dataset.opened = "true";
-    }
-    updateTable();
-}
-
-function toggleMinimize(e) {
-    e.stopPropagation();
-    const panel = document.getElementById('data-panel');
-    const btn = e.target;
-    if(panel.classList.contains('minimized')) {
-        panel.classList.remove('minimized');
-        btn.innerText = '_';
-    } else {
-        panel.classList.add('minimized');
-        btn.innerText = '□';
-    }
-}
-
-function initDraggablePanel() {
-    const panel = document.getElementById('data-panel');
-    const header = document.getElementById('panel-header');
-    let isPanelDragging = false;
-    let startX, startY, initialLeft, initialTop;
-
-    const startDrag = (e) => {
-        // 如果點到的是按鈕，不要拖曳
-        if(e.target.classList.contains('btn-min')) return;
+        let canvas, ctx;
+        let width, height;
+        let nodes = []; 
+        let seeds = new Set();
+        let isSimulating = false;
+        let mySeed = 2026;
         
-        isPanelDragging = true;
-        let clientX = e.clientX || (e.touches ? e.touches[0].clientX : 0);
-        let clientY = e.clientY || (e.touches ? e.touches[0].clientY : 0);
-        startX = clientX;
-        startY = clientY;
-        initialLeft = panel.offsetLeft;
-        initialTop = panel.offsetTop;
-        
-        // 綁定到 document 以防拖出範圍
-        document.addEventListener('mousemove', onDrag);
-        document.addEventListener('mouseup', stopDrag);
-        document.addEventListener('touchmove', onDrag, {passive: false});
-        document.addEventListener('touchend', stopDrag);
-    };
+        // 拖曳變數
+        let dragNode = null;
+        let isDraggingNode = false;
+        let dragStartPos = {x:0, y:0};
 
-    const onDrag = (e) => {
-        if(!isPanelDragging) return;
-        e.preventDefault();
-        let clientX = e.clientX || (e.touches ? e.touches[0].clientX : 0);
-        let clientY = e.clientY || (e.touches ? e.touches[0].clientY : 0);
-        let dx = clientX - startX;
-        let dy = clientY - startY;
-        
-        // 限制不要拖出畫面
-        let newLeft = initialLeft + dx;
-        let newTop = initialTop + dy;
-        let maxLeft = document.getElementById('canvas-wrapper').clientWidth - panel.offsetWidth;
-        let maxTop = document.getElementById('canvas-wrapper').clientHeight - panel.offsetHeight;
-
-        panel.style.left = Math.max(0, Math.min(maxLeft, newLeft)) + 'px';
-        panel.style.top = Math.max(0, Math.min(maxTop, newTop)) + 'px';
-    };
-
-    const stopDrag = () => {
-        isPanelDragging = false;
-        document.removeEventListener('mousemove', onDrag);
-        document.removeEventListener('mouseup', stopDrag);
-        document.removeEventListener('touchmove', onDrag);
-        document.removeEventListener('touchend', stopDrag);
-    };
-
-    header.addEventListener('mousedown', startDrag);
-    header.addEventListener('touchstart', startDrag, {passive: false});
-}
-
-function reloadMap() {
-    let inputVal = document.getElementById('seedInput').value;
-    mySeed = parseInt(inputVal) || 2026;
-    resetGameData();
-    
-    nodes = [];
-    let attempts = 0;
-    // 讓節點不要太貼邊
-    let padding = NODE_RADIUS * 1.5;
-    let safeW = width - 2 * padding;
-    let safeH = height - 2 * padding;
-
-    while(nodes.length < NODE_COUNT && attempts < 2000) {
-        attempts++;
-        let x = padding + seededRandom() * safeW;
-        let y = padding + seededRandom() * safeH;
-        
-        let overlap = false;
-        for(let n of nodes) {
-            // 保持一定距離
-            if(Math.hypot(n.x - x, n.y - y) < NODE_RADIUS * 2.8) {
-                overlap = true; break;
-            }
-        }
-        if(!overlap) {
-            nodes.push({
-                id: nodes.length + 1,
-                x: x, y: y,
-                power: Math.floor(seededRandom() * 9) + 1, 
-                threshold: Math.floor(seededRandom() * 4) + 2, 
-                currentInput: 0,
-                state: 'normal',
-                neighbors: []
-            });
-        }
-    }
-
-    // 連線生成邏輯
-    let connected = [0]; 
-    let unconnected = []; 
-    for(let i=1; i<NODE_COUNT; i++) unconnected.push(i);
-    let rawPairs = [];
-
-    while(unconnected.length > 0) {
-        let uIdx = Math.floor(seededRandom() * connected.length);
-        let u = connected[uIdx];
-        let bestVIdx = -1;
-        let minDist = Infinity;
-        
-        // 嘗試找最近的點，讓圖比較好看
-        for(let k=0; k<5; k++) {
-             let tryIdx = Math.floor(seededRandom() * unconnected.length);
-             let vCand = unconnected[tryIdx];
-             let d = Math.hypot(nodes[u].x - nodes[vCand].x, nodes[u].y - nodes[vCand].y);
-             if(d < minDist) { minDist = d; bestVIdx = tryIdx; }
-        }
-        if(bestVIdx === -1) bestVIdx = 0; // fallback
-        
-        let v = unconnected[bestVIdx];
-        rawPairs.push({u: u, v: v});
-        connected.push(v);
-        unconnected.splice(bestVIdx, 1);
-    }
-
-    // 加一些隨機邊
-    for(let i=0; i<NODE_COUNT; i++) {
-        let u = i;
-        let v = Math.floor(seededRandom() * NODE_COUNT);
-        if(u !== v && !rawPairs.some(p => (p.u===u && p.v===v) || (p.u===v && p.v===u))) {
-             // 距離太遠不連
-             if(Math.hypot(nodes[u].x - nodes[v].x, nodes[u].y - nodes[v].y) < width * 0.45) {
-                 rawPairs.push({u: u, v: v});
-             }
-        }
-    }
-
-    let adj = Array.from({length: NODE_COUNT}, () => []);
-    rawPairs.forEach(p => { adj[p.u].push(p.v); adj[p.v].push(p.u); });
-
-    for(let i=0; i<NODE_COUNT; i++) {
-        let degree = adj[i].length;
-        if(degree === 0) continue;
-        let weights = [];
-        let sum = 0;
-        for(let k=0; k<degree; k++) {
-            let r = Math.floor(seededRandom() * 10) + 1; 
-            weights.push(r);
-            sum += r;
-        }
-        for(let k=0; k<degree; k++) {
-            let targetId = adj[i][k];
-            let w = weights[k] / sum;
-            nodes[i].neighbors.push({
-                target: nodes[targetId], weight: w, active: false 
-            });
-        }
-    }
-    updateTable();
-    showToast(`地圖 ${inputVal} 已載入`);
-}
-
-function resetGameData() {
-    isSimulating = false;
-    seeds.clear();
-    if(nodes.length > 0) {
-        nodes.forEach(n => {
-            n.state = 'normal';
-            n.currentInput = 0;
-            n.neighbors.forEach(e => e.active = false);
-        });
-    }
-    updateUI();
-    updateTable();
-}
-
-function updateTable() {
-    const tbody = document.getElementById('data-body');
-    if(!tbody) return;
-    const panel = document.getElementById('data-panel');
-    if(!panel.classList.contains('visible')) return;
-
-    let html = '';
-    let sortedNodes = [...nodes].sort((a,b) => a.id - b.id);
-
-    sortedNodes.forEach(n => {
-        let rowClass = '';
-        let inputDisplay = n.currentInput.toFixed(1);
-        
-        if(n.state === 'seed') {
-            rowClass = 'row-seed';
-            inputDisplay = '(種子)';
-        } else if(n.state === 'active') {
-            rowClass = 'row-active';
-        } else if(n.currentInput > 0) {
-            rowClass = 'row-wa';
+        function seededRandom() {
+            mySeed = (mySeed * 9301 + 49297) % 233280;
+            return mySeed / 233280;
         }
 
-        html += `<tr class="${rowClass}">
-            <td><b>${n.id}</b></td>
-            <td>${n.threshold}</td>
-            <td>${inputDisplay}</td>
-        </tr>`;
-    });
-    tbody.innerHTML = html;
-}
-
-// --- 互動 (整合 Pointer) ---
-function getPointerPos(e) {
-    let rect = canvas.getBoundingClientRect();
-    let clientX = e.clientX;
-    let clientY = e.clientY;
-    
-    // 處理 Touch 事件
-    if(e.touches && e.touches.length > 0) {
-        clientX = e.touches[0].clientX;
-        clientY = e.touches[0].clientY;
-    } else if (e.changedTouches && e.changedTouches.length > 0) {
-        // 處理 touchend
-        clientX = e.changedTouches[0].clientX;
-        clientY = e.changedTouches[0].clientY;
-    }
-
-    return {
-        x: clientX - rect.left,
-        y: clientY - rect.top
-    };
-}
-
-function onPointerDown(e) {
-    if(isSimulating) return;
-    // e.preventDefault() // 這裡先不加，讓外部判斷
-    
-    let pos = getPointerPos(e);
-    for(let n of nodes) {
-        let d = Math.hypot(pos.x - n.x, pos.y - n.y);
-        // 增加觸控判定範圍
-        if(d < NODE_RADIUS * 1.8) {
-            dragNode = n;
-            dragStartPos = {x: pos.x, y: pos.y};
-            isDraggingNode = false;
-            return;
-        }
-    }
-}
-
-function onPointerMove(e) {
-    if(!dragNode) return;
-    e.preventDefault(); // 拖曳時禁止捲動
-    
-    let pos = getPointerPos(e);
-    if(!isDraggingNode) {
-        let distMoved = Math.hypot(pos.x - dragStartPos.x, pos.y - dragStartPos.y);
-        if(distMoved > 5) isDraggingNode = true;
-    }
-    if(isDraggingNode) {
-        let pad = NODE_RADIUS;
-        dragNode.x = Math.max(pad, Math.min(width - pad, pos.x));
-        dragNode.y = Math.max(pad, Math.min(height - pad, pos.y));
-    }
-}
-
-function onPointerUp(e) {
-    if(dragNode) {
-        if(!isDraggingNode) toggleSeed(dragNode);
-        dragNode = null; isDraggingNode = false;
-    }
-}
-
-function loop() {
-    ctx.fillStyle = '#fff'; 
-    ctx.fillRect(0, 0, width, height);
-
-    try {
-        nodes.forEach(source => {
-            source.neighbors.forEach(edge => {
-                drawCurve(source, edge.target, edge.active, edge.weight, false);
-            });
-        });
-
-        nodes.forEach(n => {
-            ctx.beginPath();
-            ctx.arc(n.x, n.y, NODE_RADIUS, 0, Math.PI*2);
-            ctx.shadowColor = 'rgba(0,0,0,0.15)'; ctx.shadowBlur = 4;
+        window.onload = function() {
+            canvas = document.getElementById('gameCanvas');
+            ctx = canvas.getContext('2d');
             
-            if(n.state === 'seed') {
-                ctx.fillStyle = '#e74c3c'; ctx.strokeStyle = '#c0392b';
-            } else if(n.state === 'active') {
-                ctx.fillStyle = '#ff7675'; ctx.strokeStyle = '#d63031';
-            } else if(n.currentInput > 0) {
-                ctx.fillStyle = '#ffeaa7'; ctx.strokeStyle = '#fdcb6e';
-            } else {
-                ctx.fillStyle = '#ecf0f1'; ctx.strokeStyle = '#bdc3c7';
-            }
-            
-            ctx.fill();
-            ctx.shadowBlur = 0; ctx.lineWidth = 2; ctx.stroke();
+            const wrapper = document.getElementById('canvas-wrapper');
+            const observer = new ResizeObserver(() => resizeCanvas());
+            observer.observe(wrapper);
 
-            ctx.fillStyle = '#2d3436';
-            ctx.font = 'bold 16px Arial'; // 字體微調
-            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-            ctx.fillText(n.id, n.x, n.y);
+            // 綁定事件
+            canvas.addEventListener('mousedown', onPointerDown);
+            canvas.addEventListener('touchstart', onPointerDown, {passive: false});
+            canvas.addEventListener('mousemove', onPointerMove);
+            canvas.addEventListener('touchmove', onPointerMove, {passive: false});
+            window.addEventListener('mouseup', onPointerUp);
+            window.addEventListener('touchend', onPointerUp, {passive: false});
 
-            ctx.fillStyle = '#555';
-            ctx.font = 'bold 11px Arial';
-            ctx.fillText(`${n.power} | ${n.threshold}`, n.x, n.y + NODE_RADIUS + 12);
+            resizeCanvas();
+            setTimeout(() => { reloadMap(); loop(); }, 100);
+        };
 
-            if(n.state !== 'seed' && n.currentInput > 0) {
-                ctx.fillStyle = '#0984e3'; 
-                ctx.font = 'bold 14px Arial';
-                ctx.fillText(`R:${n.currentInput.toFixed(1)}`, n.x, n.y - NODE_RADIUS - 12);
-            }
-        });
-
-        nodes.forEach(source => {
-            source.neighbors.forEach(edge => {
-                drawCurve(source, edge.target, edge.active, edge.weight, true);
-            });
-        });
-    } catch (e) {}
-
-    requestAnimationFrame(loop);
-}
-
-function drawCurve(source, target, isActive, weight, drawLabelOnly) {
-    let dx = target.x - source.x;
-    let dy = target.y - source.y;
-    let dist = Math.sqrt(dx*dx + dy*dy);
-    if(dist < 1) return;
-
-    let midX = (source.x + target.x) / 2;
-    let midY = (source.y + target.y) / 2;
-    let offset = 30; // 弧度稍微減小一點，比較不會太亂
-    let normX = -dy / dist;
-    let normY = dx / dist;
-    let ctrlX = midX + normX * offset;
-    let ctrlY = midY + normY * offset;
-
-    if(!drawLabelOnly) {
-        ctx.beginPath();
-        ctx.moveTo(source.x, source.y);
-        ctx.quadraticCurveTo(ctrlX, ctrlY, target.x, target.y);
-        if(isActive) {
-            ctx.strokeStyle = '#f1c40f'; ctx.lineWidth = 4;
-        } else {
-            ctx.strokeStyle = '#ccc'; ctx.lineWidth = 1.5;
+        function resizeCanvas() {
+            const wrapper = document.getElementById('canvas-wrapper');
+            const rect = wrapper.getBoundingClientRect();
+            const dpr = window.devicePixelRatio || 1;
+            canvas.width = rect.width * dpr;
+            canvas.height = rect.height * dpr;
+            ctx.scale(dpr, dpr);
+            width = rect.width;
+            height = rect.height;
         }
-        ctx.stroke();
 
-        let t = 0.85; let invT = 1-t;
-        let arrowX = invT*invT*source.x + 2*invT*t*ctrlX + t*t*target.x;
-        let arrowY = invT*invT*source.y + 2*invT*t*ctrlY + t*t*target.y;
-        let tanX = 2*invT*(ctrlX-source.x) + 2*t*(target.x-ctrlX);
-        let tanY = 2*invT*(ctrlY-source.y) + 2*t*(target.y-ctrlY);
-        drawArrowHead(ctx, arrowX, arrowY, Math.atan2(tanY, tanX));
-    } else {
-        let t = 0.4; let invT = 1-t;
-        let labelX = invT*invT*source.x + 2*invT*t*ctrlX + t*t*target.x;
-        let labelY = invT*invT*source.y + 2*invT*t*ctrlY + t*t*target.y;
-        let txt = Math.round(weight * 100) + "%";
-        ctx.fillStyle = 'rgba(255,255,255,0.8)';
-        let metrics = ctx.measureText(txt);
-        let w = metrics.width + 4;
-        ctx.fillRect(labelX - w/2, labelY - 8, w, 16);
-        ctx.fillStyle = '#666';
-        ctx.font = '10px Arial';
-        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        ctx.fillText(txt, labelX, labelY);
-    }
-}
+        function getPointerPos(e) {
+            let rect = canvas.getBoundingClientRect();
+            let clientX = e.clientX;
+            let clientY = e.clientY;
+            if(e.touches && e.touches.length > 0) {
+                clientX = e.touches[0].clientX;
+                clientY = e.touches[0].clientY;
+            } else if (e.changedTouches && e.changedTouches.length > 0) {
+                clientX = e.changedTouches[0].clientX;
+                clientY = e.changedTouches[0].clientY;
+            }
+            return { x: clientX - rect.left, y: clientY - rect.top };
+        }
 
-function drawArrowHead(ctx, x, y, angle) {
-    ctx.save(); ctx.translate(x, y); ctx.rotate(angle);
-    ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(-7, -3.5); ctx.lineTo(-7, 3.5);
-    ctx.closePath(); ctx.fillStyle = ctx.strokeStyle; ctx.fill(); ctx.restore();
-}
+        // --- 拖曳與點擊邏輯 ---
+        function onPointerDown(e) {
+            if(isSimulating) return;
+            if(e.target !== canvas) return;
+            if(e.type === 'touchstart') e.preventDefault();
 
-function toggleSeed(n) {
-    if(seeds.has(n)) {
-        seeds.delete(n);
-        n.state = 'normal';
-        n.currentInput = 0;
-    } else {
-        if(seeds.size >= MAX_SEEDS) { showToast("已達 3 個上限"); return; }
-        seeds.add(n);
-        n.state = 'seed';
-        n.currentInput = n.threshold + 99; 
-    }
-    updateUI();
-    updateTable();
-}
-
-function updateUI() {
-    document.getElementById('ui-seeds').innerText = seeds.size;
-    let active = nodes.filter(n => n.state === 'seed' || n.state === 'active').length;
-    document.getElementById('ui-active').innerText = active;
-    document.getElementById('btn-start').disabled = (seeds.size === 0);
-}
-
-function showToast(msg) {
-    let t = document.getElementById('toast');
-    t.innerText = msg; t.style.opacity = 1;
-    setTimeout(()=>t.style.opacity=0, 2000);
-}
-
-async function startSim() {
-    isSimulating = true;
-    document.querySelectorAll('.btn').forEach(b => b.disabled = true);
-    showToast("擴散中...");
-
-    let queue = [...seeds];
-    let visitedEdges = new Set();
-
-    while(queue.length > 0) {
-        await new Promise(r => setTimeout(r, 800));
-        let nextQueue = [];
-
-        for(let source of queue) {
-            for(let edge of source.neighbors) {
-                let edgeKey = `${source.id}-${edge.target.id}`;
-                if(visitedEdges.has(edgeKey)) continue;
-
-                let target = edge.target;
-                if(target.state === 'seed') {
-                    visitedEdges.add(edgeKey); continue;
+            let pos = getPointerPos(e);
+            
+            for(let n of nodes) {
+                if(Math.hypot(pos.x - n.x, pos.y - n.y) < NODE_RADIUS * 1.5) {
+                    dragNode = n;
+                    dragStartPos = {x: pos.x, y: pos.y};
+                    isDraggingNode = false;
+                    return;
                 }
-
-                visitedEdges.add(edgeKey);
-                edge.active = true;
-                target.currentInput += source.power * edge.weight;
             }
         }
-        
-        nodes.forEach(n => {
-            // 修正判定：只要能量大於門檻，且尚未激活，就激活並加入下輪擴散
-            // 注意：要避免已經是 seed 的人再次被加入 queue
-            if(n.state === 'normal' && n.currentInput > n.threshold) {
-                n.state = 'active';
-                nextQueue.push(n);
-            }
-        });
-        queue = nextQueue;
-        updateUI();
-        updateTable(); 
-    }
-    showToast("模擬結束");
-    document.querySelector('.btn-reset').disabled = false;
-    document.querySelector('.btn-toggle').disabled = false;
-}
 
-function resetGame() {
-    resetGameData();
-    document.querySelectorAll('.btn').forEach(b => b.disabled = false);
-    document.getElementById('btn-start').disabled = true;
-}
-</script>
+        function onPointerMove(e) {
+            if(!dragNode) return;
+            if(e.type === 'touchmove') e.preventDefault(); 
+            
+            let pos = getPointerPos(e);
+            if(!isDraggingNode) {
+                let dist = Math.hypot(pos.x - dragStartPos.x, pos.y - dragStartPos.y);
+                if(dist > 5) isDraggingNode = true;
+            }
+            if(isDraggingNode) {
+                let p = NODE_RADIUS;
+                dragNode.x = Math.max(p, Math.min(width - p, pos.x));
+                dragNode.y = Math.max(p, Math.min(height - p, pos.y));
+            }
+        }
+
+        function onPointerUp(e) {
+            if(e.type === 'touchend' && e.target === canvas) e.preventDefault();
+            if(dragNode) {
+                if (!isDraggingNode) toggleSeed(dragNode);
+                dragNode = null; 
+                isDraggingNode = false;
+            }
+        }
+
+        // --- 遊戲邏輯 ---
+        function reloadMap() {
+            let val = document.getElementById('seedInput').value;
+            mySeed = parseInt(val) || 2026;
+            resetGameData();
+            nodes = [];
+            
+            let pad = NODE_RADIUS * 1.5;
+            let safeW = width - 2 * pad;
+            let safeH = height - 2 * pad;
+            let attempts = 0;
+
+            while(nodes.length < NODE_COUNT && attempts < 2000) {
+                attempts++;
+                let x = pad + seededRandom() * safeW;
+                let y = pad + seededRandom() * safeH;
+                let overlap = false;
+                for(let n of nodes) {
+                    if(Math.hypot(n.x - x, n.y - y) < NODE_RADIUS * 2.5) overlap = true;
+                }
+                if(!overlap) {
+                    nodes.push({
+                        id: nodes.length + 1, x, y,
+                        power: Math.floor(seededRandom() * 9) + 1, 
+                        threshold: Math.floor(seededRandom() * 4) + 2, 
+                        currentInput: 0, state: 'normal', neighbors: []
+                    });
+                }
+            }
+
+            let connected = [0], unconnected = [];
+            for(let i=1; i<NODE_COUNT; i++) unconnected.push(i);
+            let pairs = [];
+            while(unconnected.length > 0) {
+                let u = connected[Math.floor(seededRandom() * connected.length)];
+                let bestV = -1, minDist = Infinity, bestIdx = -1;
+                for(let k=0; k<5; k++) {
+                     let idx = Math.floor(seededRandom() * unconnected.length);
+                     let v = unconnected[idx];
+                     let d = Math.hypot(nodes[u].x - nodes[v].x, nodes[u].y - nodes[v].y);
+                     if(d < minDist) { minDist = d; bestV = v; bestIdx = idx; }
+                }
+                if(bestV === -1) { bestV = unconnected[0]; bestIdx = 0; }
+                pairs.push({u: u, v: bestV});
+                connected.push(bestV); unconnected.splice(bestIdx, 1);
+            }
+            for(let i=0; i<NODE_COUNT; i++) {
+                let u = i, v = Math.floor(seededRandom() * NODE_COUNT);
+                if(u !== v && !pairs.some(p => (p.u===u && p.v===v) || (p.u===v && p.v===u))) {
+                     if(Math.hypot(nodes[u].x - nodes[v].x, nodes[u].y - nodes[v].y) < width * 0.45) {
+                         pairs.push({u: u, v: v});
+                     }
+                }
+            }
+
+            let adj = Array.from({length: NODE_COUNT}, () => []);
+            pairs.forEach(p => { adj[p.u].push(p.v); adj[p.v].push(p.u); });
+
+            for(let i=0; i<NODE_COUNT; i++) {
+                let deg = adj[i].length;
+                if(deg === 0) continue;
+                let wList = [], sum = 0;
+                for(let k=0; k<deg; k++) { let r = Math.floor(seededRandom() * 10) + 1; wList.push(r); sum += r; }
+                for(let k=0; k<deg; k++) {
+                    nodes[i].neighbors.push({ target: nodes[adj[i][k]], weight: wList[k] / sum, active: false });
+                }
+            }
+            updateTable();
+            showToast(`地圖 ${val} 已載入`);
+        }
+
+        function resetGameData() {
+            isSimulating = false;
+            seeds.clear();
+            nodes.forEach(n => { n.state = 'normal'; n.currentInput = 0; n.neighbors.forEach(e => e.active = false); });
+            updateUI(); updateTable();
+        }
+
+        function toggleSeed(n) {
+            if(seeds.has(n)) {
+                seeds.delete(n); n.state = 'normal'; n.currentInput = 0;
+            } else {
+                if(seeds.size >= MAX_SEEDS) { showToast("已達 3 個上限"); return; }
+                seeds.add(n); n.state = 'seed'; n.currentInput = n.threshold + 99;
+            }
+            updateUI(); updateTable();
+        }
+
+        function updateUI() {
+            document.getElementById('ui-seeds').innerText = seeds.size;
+            let activeCount = nodes.filter(n => n.state === 'seed' || n.state === 'active').length;
+            document.getElementById('ui-active').innerText = activeCount;
+            document.getElementById('btn-start').disabled = (seeds.size === 0);
+        }
+
+        function toggleTable() {
+            const panel = document.getElementById('data-panel');
+            panel.classList.toggle('visible');
+            updateTable();
+        }
+
+        function updateTable() {
+            const tbody = document.getElementById('data-body');
+            if(!document.getElementById('data-panel').classList.contains('visible')) return;
+            let html = '';
+            [...nodes].sort((a,b) => a.id - b.id).forEach(n => {
+                let cls = '';
+                if(n.state === 'seed') cls = 'row-seed';
+                else if(n.state === 'active') cls = 'row-active';
+                html += `<tr class="${cls}"><td><b>${n.id}</b></td><td>${n.threshold}</td><td>${n.currentInput.toFixed(1)}</td></tr>`;
+            });
+            tbody.innerHTML = html;
+        }
+
+        function loop() {
+            ctx.clearRect(0,0, canvas.width, canvas.height);
+            // 繪製格線背景
+            ctx.strokeStyle = '#f0f0f0'; ctx.lineWidth = 1;
+            for(let x=0; x<width; x+=40) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,height); ctx.stroke(); }
+            for(let y=0; y<height; y+=40) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(width,y); ctx.stroke(); }
+
+            nodes.forEach(source => {
+                source.neighbors.forEach(edge => {
+                    drawCurve(source, edge.target, edge.active, edge.weight);
+                });
+            });
+
+            nodes.forEach(n => {
+                ctx.beginPath();
+                ctx.arc(n.x, n.y, NODE_RADIUS, 0, Math.PI*2);
+                ctx.shadowColor = 'rgba(0,0,0,0.1)'; ctx.shadowBlur = 4;
+                
+                if(n.state === 'seed') {
+                    ctx.fillStyle = '#e74c3c'; ctx.strokeStyle = '#c0392b';
+                } else if(n.state === 'active') {
+                    ctx.fillStyle = '#ff7675'; ctx.strokeStyle = '#d63031';
+                } else if(n.currentInput > 0) {
+                    ctx.fillStyle = '#ffeaa7'; ctx.strokeStyle = '#fdcb6e';
+                } else {
+                    ctx.fillStyle = '#ecf0f1'; ctx.strokeStyle = '#bdc3c7';
+                }
+                
+                ctx.fill(); ctx.shadowBlur = 0; ctx.lineWidth = 2; ctx.stroke();
+                ctx.fillStyle = '#2d3436'; ctx.font = 'bold 16px Arial'; 
+                ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+                ctx.fillText(n.id, n.x, n.y);
+                ctx.fillStyle = '#555'; ctx.font = 'bold 11px Arial';
+                ctx.fillText(`${n.power} | ${n.threshold}`, n.x, n.y + NODE_RADIUS + 12);
+                if(n.state !== 'seed' && n.currentInput > 0) {
+                    ctx.fillStyle = '#0984e3'; ctx.font = 'bold 14px Arial';
+                    ctx.fillText(`R:${n.currentInput.toFixed(1)}`, n.x, n.y - NODE_RADIUS - 12);
+                }
+            });
+            requestAnimationFrame(loop);
+        }
+
+        function drawCurve(s, t, active, w) {
+            let dx = t.x - s.x, dy = t.y - s.y, dist = Math.sqrt(dx*dx + dy*dy);
+            if(dist < 1) return;
+            let midX = (s.x + t.x) / 2, midY = (s.y + t.y) / 2;
+            let offset = 30;
+            let cx = midX - dy/dist * offset;
+            let cy = midY + dx/dist * offset;
+            ctx.beginPath(); ctx.moveTo(s.x, s.y); ctx.quadraticCurveTo(cx, cy, t.x, t.y);
+            if(active) { ctx.strokeStyle = '#f1c40f'; ctx.lineWidth = 4; }
+            else { ctx.strokeStyle = '#dcdde1'; ctx.lineWidth = 1.5; }
+            ctx.stroke();
+            
+            // 權重文字
+            let tt = 0.4, itt = 1 - tt;
+            let lx = itt*itt*s.x + 2*itt*tt*cx + tt*tt*t.x;
+            let ly = itt*itt*s.y + 2*itt*tt*cy + tt*tt*t.y;
+            ctx.fillStyle = 'rgba(255,255,255,0.8)';
+            let txt = Math.round(w*100) + "%";
+            let tw = ctx.measureText(txt).width;
+            ctx.fillRect(lx - tw/2 - 2, ly - 8, tw + 4, 16);
+            ctx.fillStyle = '#666'; ctx.font = '10px Arial';
+            ctx.fillText(txt, lx, ly);
+        }
+
+        async function startSim() {
+            isSimulating = true;
+            document.querySelectorAll('.btn').forEach(b => b.disabled = true);
+            showToast("擴散中...");
+            let queue = [...seeds];
+            let visitedEdges = new Set();
+            while(queue.length > 0) {
+                await new Promise(r => setTimeout(r, 800));
+                let nextQueue = [];
+                for(let source of queue) {
+                    for(let edge of source.neighbors) {
+                        let key = `${source.id}-${edge.target.id}`;
+                        if(visitedEdges.has(key)) continue;
+                        let target = edge.target;
+                        if(target.state === 'seed') { visitedEdges.add(key); continue; }
+                        visitedEdges.add(key);
+                        edge.active = true;
+                        target.currentInput += source.power * edge.weight;
+                    }
+                }
+                nodes.forEach(n => {
+                    if(n.state === 'normal' && n.currentInput > n.threshold) {
+                        n.state = 'active'; nextQueue.push(n);
+                    }
+                });
+                queue = nextQueue;
+                updateUI(); updateTable();
+            }
+            showToast("擴散結束");
+            document.querySelectorAll('.btn').forEach(b => b.disabled = false);
+            document.getElementById('btn-start').disabled = true;
+        }
+
+        function resetGame() {
+            resetGameData();
+            document.querySelectorAll('.btn').forEach(b => b.disabled = false);
+            document.getElementById('btn-start').disabled = true;
+        }
+
+        function showToast(msg) {
+            let t = document.getElementById('toast');
+            t.innerText = msg; t.style.opacity = 1;
+            setTimeout(() => t.style.opacity = 0, 2000);
+        }
+    </script>
 </body>
 </html>
